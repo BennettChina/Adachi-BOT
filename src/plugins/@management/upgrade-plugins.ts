@@ -28,7 +28,8 @@ class PluginUpgrade {
 		private file: InputParameter["file"],
 		private redis: InputParameter["redis"],
 		private sendMessage: InputParameter["sendMessage"],
-		private command: InputParameter["command"]
+		private command: InputParameter["command"],
+		private config: InputParameter["config"]
 	) {
 	}
 	
@@ -42,35 +43,72 @@ class PluginUpgrade {
 		return [ json ];
 	}
 	
-	/**
-	 * 更新 plugin
-	 * @return 是否更新成功
-	 */
-	private async updateBotPlugin( pluginInfo: PluginInfo, isForce: boolean = false ): Promise<boolean> {
-		const command = !isForce ? "git pull --no-rebase" : "git reset --hard && git pull --no-rebase";
-		const cwd = this.file.getFilePath( pluginInfo.key, "plugin" );
-		const execPromise = execCommand( command, { cwd } ).then( ( stdout: string ) => {
-			this.logger.info( stdout );
-			if ( /(Already up[ -]to[ -]date|已经是最新的)/.test( stdout ) ) {
-				this.alreadyLatest.push( pluginInfo.key );
+	// 开始更新任务
+	async startTask( pluginList: PluginInfo[], isForce = false, isReload = false ): Promise<void> {
+		/* 整理可用任务列表，排除无需更新、获取 commit 错误的插件，收集错误与消息内容 */
+		const taskList = pluginList.map( pluginInfo => this.taskQueue.enqueue( async () => {
+			if ( !pluginInfo.upgrade ) {
+				this.notSupportUpgradePlugins.push( pluginInfo.key );
+				return null;
 			}
-		} );
-		
-		try {
-			await waitWithTimeout( execPromise, 30000 );
-		} catch ( error ) {
-			this.logger.error( `更新 BOT Plugin:[${ pluginInfo.key }] 失败: ${ typeof error === "string" ? error : ( <Error>error ).message }` );
-			if ( typeof error === "string" ) {
-				// 此时网络超时
-				this.upgradeTimoutErrors.push( pluginInfo.key );
-			} else {
-				// 更新异常
-				this.upgradeErrors.push( pluginInfo.key );
+			const dbKey = `adachi.${ pluginInfo.key }.update-time`;
+			const date = await this.checkGitCommit( dbKey, pluginInfo.upgrade );
+			if ( !date ) return null;
+			if ( pluginInfo.key === "meme-making" ) {
+				console.log( 4 )
 			}
-			return false;
+			return {
+				dbKey,
+				pluginInfo,
+				updateDate: date
+			}
+		} ) );
+		// 执行任务
+		const taskListResult = await Promise.all( taskList );
+		// 先把初次更新的插件提示消息发出去
+		if ( this.initPlugin.length ) {
+			await this.sendMessage( `初次使用指令更新[${ this.initPlugin.join( "、" ) }]，将直接尝试更新这些插件。` )
 		}
 		
-		return true;
+		// 成功更新的插件列表
+		const upgradePlugins: PluginInfo[] = [];
+		const upgradeTaskList = taskListResult
+			.filter( t => t )
+			.map( res => this.taskQueue.enqueue( async () => {
+				if ( !res ) return;
+				const updateRes = await this.updateBotPlugin( res.pluginInfo, isForce );
+				if ( updateRes ) {
+					upgradePlugins.push( res.pluginInfo );
+					await this.redis.setString( res.dbKey, res.updateDate );
+				}
+			} ) );
+		await Promise.all( upgradeTaskList );
+		
+		// 获取所有错误信息
+		const errorResult = this.getErrorResult( isForce );
+		
+		if ( !upgradePlugins.length ) {
+			errorResult.push( "\n没有插件被更新!" )
+			await this.sendMessage( errorResult.join( "\n" ) );
+			return;
+		}
+		
+		errorResult.push( `\n[${ upgradePlugins.map( p => p.name ).join( "、" ) }]已完成更新，正在检查并安装依赖...` );
+		await this.sendMessage( errorResult.join( "\n" ) );
+		
+		// 安装/更新依赖
+		const errorMsg = await this.installDependencies();
+		if ( errorMsg ) {
+			await this.sendMessage( errorMsg );
+		} else {
+			await this.sendMessage( `检查安装依赖完成，${ isReload ? "正在重载插件..." : "请稍后手动重载插件" }` );
+		}
+		
+		// 是否需要重载
+		if ( isReload ) {
+			const errMsg = await this.reloadPlugin( upgradePlugins );
+			await this.sendMessage( errMsg || "所有插件重载完成" );
+		}
 	}
 	
 	/* 安装依赖 */
@@ -181,72 +219,47 @@ class PluginUpgrade {
 		return errorMsg;
 	}
 	
-	// 开始更新任务
-	async startTask( pluginList: PluginInfo[], isForce = false, isReload = false ): Promise<void> {
-		/* 整理可用任务列表，排除无需更新、获取 commit 错误的插件，收集错误与消息内容 */
-		const taskList = pluginList.map( pluginInfo => this.taskQueue.enqueue( async () => {
-			if ( !pluginInfo.upgrade ) {
-				this.notSupportUpgradePlugins.push( pluginInfo.key );
-				return null;
+	/**
+	 * 更新 plugin
+	 * @return 是否更新成功
+	 */
+	private async updateBotPlugin( pluginInfo: PluginInfo, isForce: boolean = false ): Promise<boolean> {
+		const command = !isForce ? "git pull --no-rebase" : "git reset --hard && git pull --no-rebase";
+		const cwd = this.file.getFilePath( pluginInfo.key, "plugin" );
+		const proxy_env = {};
+		if ( this.config.base.proxy.enabled ) {
+			proxy_env["http_proxy"] = this.config.base.proxy.httpProxy;
+			proxy_env["https_proxy"] = this.config.base.proxy.httpsProxy;
+			proxy_env["all_proxy"] = this.config.base.proxy.sockets5Proxy;
+		}
+		const execPromise = execCommand( command, {
+			cwd,
+			env: {
+				...process.env,
+				...proxy_env
 			}
-			const dbKey = `adachi.${ pluginInfo.key }.update-time`;
-			const date = await this.checkGitCommit( dbKey, pluginInfo.upgrade );
-			if ( !date ) return null;
-			if ( pluginInfo.key === "meme-making" ) {
-				console.log( 4 )
+		} ).then( ( stdout: string ) => {
+			this.logger.info( stdout );
+			if ( /(Already up[ -]to[ -]date|已经是最新的)/.test( stdout ) ) {
+				this.alreadyLatest.push( pluginInfo.key );
 			}
-			return {
-				dbKey,
-				pluginInfo,
-				updateDate: date
+		} );
+		
+		try {
+			await waitWithTimeout( execPromise, 30000 );
+		} catch ( error ) {
+			this.logger.error( `更新 BOT Plugin:[${ pluginInfo.key }] 失败: ${ typeof error === "string" ? error : ( <Error>error ).message }` );
+			if ( typeof error === "string" ) {
+				// 此时网络超时
+				this.upgradeTimoutErrors.push( pluginInfo.key );
+			} else {
+				// 更新异常
+				this.upgradeErrors.push( pluginInfo.key );
 			}
-		} ) );
-		// 执行任务
-		const taskListResult = await Promise.all( taskList );
-		// 先把初次更新的插件提示消息发出去
-		if ( this.initPlugin.length ) {
-			await this.sendMessage( `初次使用指令更新[${ this.initPlugin.join( "、" ) }]，将直接尝试更新这些插件。` )
+			return false;
 		}
 		
-		// 成功更新的插件列表
-		const upgradePlugins: PluginInfo[] = [];
-		const upgradeTaskList = taskListResult
-			.filter( t => t )
-			.map( res => this.taskQueue.enqueue( async () => {
-				if ( !res ) return;
-				const updateRes = await this.updateBotPlugin( res.pluginInfo );
-				if ( updateRes ) {
-					upgradePlugins.push( res.pluginInfo );
-					await this.redis.setString( res.dbKey, res.updateDate );
-				}
-			} ) );
-		await Promise.all( upgradeTaskList );
-		
-		// 获取所有错误信息
-		const errorResult = this.getErrorResult( isForce );
-		
-		if ( !upgradePlugins.length ) {
-			errorResult.push( "\n没有插件被更新!" )
-			await this.sendMessage( errorResult.join( "\n" ) );
-			return;
-		}
-		
-		errorResult.push( `\n[${ upgradePlugins.map( p => p.name ).join( "、" ) }]已完成更新，正在检查并安装依赖...` );
-		await this.sendMessage( errorResult.join( "\n" ) );
-		
-		// 安装/更新依赖
-		const errorMsg = await this.installDependencies();
-		if ( errorMsg ) {
-			await this.sendMessage( errorMsg );
-		} else {
-			await this.sendMessage( `检查安装依赖完成，${ isReload ? "正在重载插件..." : "请稍后手动重载插件" }` );
-		}
-		
-		// 是否需要重载
-		if ( isReload ) {
-			const errMsg = await this.reloadPlugin( upgradePlugins );
-			await this.sendMessage( errMsg || "所有插件重载完成" );
-		}
+		return true;
 	}
 }
 
@@ -275,6 +288,6 @@ export default defineDirective( "order", async ( i ) => {
 		} );
 	}
 	
-	const upgradePluginTask = new PluginUpgrade( i.logger, i.file, i.redis, i.sendMessage, i.command );
+	const upgradePluginTask = new PluginUpgrade( i.logger, i.file, i.redis, i.sendMessage, i.command, i.config );
 	await upgradePluginTask.startTask( upgradePluginList, isForce, isReload );
 } );

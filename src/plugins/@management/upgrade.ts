@@ -13,11 +13,22 @@ async function getCommitsInfo(): Promise<any[]> {
 }
 
 /* 更新 bot */
-async function updateBot( { matchResult, sendMessage, logger }: InputParameter<"order"> ): Promise<void> {
+async function updateBot( { matchResult, sendMessage, logger, config }: InputParameter<"order"> ): Promise<void> {
 	const isForce = !!matchResult.match[0];
 	let command = !isForce ? "git checkout HEAD package*.json && git pull --no-rebase" : "git reset --hard && git pull --no-rebase";
-	
-	let execPromise = execCommand( command ).then( ( stdout: string ) => {
+	const proxy_env = {};
+	if ( config.base.proxy.enabled ) {
+		proxy_env["http_proxy"] = config.base.proxy.httpProxy;
+		proxy_env["https_proxy"] = config.base.proxy.httpsProxy;
+		proxy_env["all_proxy"] = config.base.proxy.sockets5Proxy;
+		proxy_env["no_proxy"] = ''
+	}
+	let execPromise = execCommand( command, {
+		env: {
+			...process.env,
+			...proxy_env
+		},
+	} ).then( ( stdout: string ) => {
 		logger.info( stdout );
 		if ( /(Already up[ -]to[ -]date|已经是最新的)/.test( stdout ) ) {
 			throw "当前已经是最新版本了";

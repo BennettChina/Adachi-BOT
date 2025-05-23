@@ -20,7 +20,13 @@ const initBase = {
 	atBOT: false,
 	addFriend: true,
 	apiTimeout: 20000,
-	renderPort: 80
+	renderPort: 80,
+	proxy: {
+		enabled: false,
+		httpProxy: "",
+		httpsProxy: "",
+		sockets5Proxy: "",
+	}
 }
 
 // 指令设置
