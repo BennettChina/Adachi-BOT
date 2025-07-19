@@ -25,7 +25,7 @@ export function urlParamsGet( url: string ): Record<string, string> {
 export function urlParamsParse( url: string | undefined, params: Record<string, string | number> ): string {
 	const paramsStr = Object.entries( params ).map( ( [ key, value ] ) => {
 		return `${ key }=${ encodeURIComponent( value ) }`;
-	} ).join( "&" );
+	} ).sort().join( "&" );
 	
 	return url ? `${ url }?${ paramsStr }` : paramsStr;
 }
