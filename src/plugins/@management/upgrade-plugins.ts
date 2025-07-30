@@ -33,16 +33,6 @@ class PluginUpgrade {
 	) {
 	}
 	
-	/* 检查更新 */
-	private async getCommitsInfo( repo: string ): Promise<any[]> {
-		const result: Response = await fetch( repo );
-		const json = await result.json();
-		if ( Array.isArray( json ) ) {
-			return json;
-		}
-		return [ json ];
-	}
-	
 	// 开始更新任务
 	async startTask( pluginList: PluginInfo[], isForce = false, isReload = false ): Promise<void> {
 		/* 整理可用任务列表，排除无需更新、获取 commit 错误的插件，收集错误与消息内容 */
@@ -52,7 +42,7 @@ class PluginUpgrade {
 				return null;
 			}
 			const dbKey = `adachi.${ pluginInfo.key }.update-time`;
-			const date = await this.checkGitCommit( dbKey, pluginInfo.upgrade );
+			const date = await this.checkGitCommit( dbKey, pluginInfo.upgrade, pluginInfo.isPrivate, pluginInfo.authorization );
 			if ( !date ) return null;
 			if ( pluginInfo.key === "meme-making" ) {
 				console.log( 4 )
@@ -111,6 +101,23 @@ class PluginUpgrade {
 		}
 	}
 	
+	/* 检查更新 */
+	private async getCommitsInfo( repo: string, isPrivate?: boolean, authorization?: string ): Promise<any[]> {
+		const headers = {}
+		if ( isPrivate && authorization ) {
+			headers["Authorization"] = `Bearer ${ authorization }`;
+		}
+		const result: Response = await fetch( repo, {
+			method: "GET",
+			headers
+		} );
+		const json = await result.json();
+		if ( Array.isArray( json ) ) {
+			return json;
+		}
+		return [ json ];
+	}
+	
 	/* 安装依赖 */
 	private async installDependencies(): Promise<string | void> {
 		try {
@@ -135,11 +142,11 @@ class PluginUpgrade {
 		}
 	}
 	
-	private async checkGitCommit( dbKey: string, repo: string ): Promise<string | null> {
+	private async checkGitCommit( dbKey: string, repo: string, isPrivate?: boolean, authorization?: string ): Promise<string | null> {
 		const pluginName = dbKey.split( "." )[1];
 		let commits: any[] = []
 		try {
-			commits = await this.getCommitsInfo( repo );
+			commits = await this.getCommitsInfo( repo, isPrivate, authorization );
 			// 此时未正常获取到 commit 信息
 			if ( !commits[0]?.commit ) {
 				this.logger.error( `更新 BOT Plugin:[${ pluginName }] 失败: ${ commits[0]?.message || "未知原因" }` )

@@ -26,6 +26,7 @@ interface RefreshRegister {
 
 export type PluginParameter = {
 	setAlias: ( aliases: string[] ) => void;
+	setAuthorization: ( authorization: string ) => void;
 	refreshRegister: RefreshRegister;
 	renderRegister: ( defaultSelector: string, baseUrl?: string ) => Renderer;
 	configRegister: <T extends Record<string, any>>(
@@ -39,6 +40,10 @@ export interface PluginInfo {
 	key: string;
 	name: string;
 	upgrade?: string;
+	/** 是否私有仓库 */
+	isPrivate?: boolean;
+	/** 私有仓库的访问 token */
+	authorization?: string;
 	assets?: PluginAssetsSetting,
 	publicDirs?: string[],
 	aliases: string[];
@@ -70,6 +75,10 @@ export interface PluginSetting {
 		repoName: string;
 		/** 分支名称 */
 		ref?: string;
+		/** 是否私有仓库 */
+		isPrivate?: boolean;
+		/** 私有仓库的访问 token */
+		authorization?: string;
 	};
 	/** 是否从线上同步更新静态资源 */
 	assets?: PluginAssetsSetting;
@@ -95,7 +104,7 @@ export const definePlugin = <T extends PluginSetting>( config: T ) => config;
 export default class Plugin {
 	private static _instance: Plugin | null = null;
 	public pluginList: Record<string, PluginInfo> = {};
-
+	
 	private pluginSettings: Record<string, PluginSetting> = {};
 	
 	constructor( private readonly bot: BOT ) {
@@ -118,7 +127,7 @@ export default class Plugin {
 		/* 从 plugins 文件夹从导入 init.ts 进行插件初始化 */
 		for ( let pluginKey of plugins ) {
 			await this.loadSingle( pluginKey, immediate, false, sortIndex );
-			sortIndex ++;
+			sortIndex++;
 		}
 		await this.bot.command.reload();
 		return this.pluginSettings;
@@ -154,7 +163,7 @@ export default class Plugin {
 			
 			// 下载 cdn lib 资源
 			await this.downloadCDNLib( cdnLib, pluginKey, pluginName );
-
+			
 			const plugin: PluginInfo = {
 				key: pluginKey,
 				name: pluginName,
@@ -184,6 +193,10 @@ export default class Plugin {
 					: `${ repo.owner }/${ repo.repoName }/commits${ repo.ref ? "/" + repo.ref : "" }`;
 				
 				plugin.upgrade = "https://api.github.com/repos/" + serverUrl;
+				if ( typeof repo !== "string" ) {
+					plugin.isPrivate = repo.isPrivate;
+					plugin.authorization = repo.authorization;
+				}
 			}
 			
 			this.bot.logger.info( `插件 ${ pluginName } 加载完成` );
@@ -203,45 +216,29 @@ export default class Plugin {
 		}
 	}
 	
-	/* 下载 cdn lib 资源 */
-	private async downloadCDNLib( cdnLib: PluginSetting["cdnLib"], pluginKey: string, pluginName: string ) {
-		if ( !cdnLib ) {
-			return;
-		}
-		
-		const saveDir = cdnLib.saveDir || "adachi-lib";
-		const downloadPromiseList: Promise<unknown>[] = [];
-		
-		const downloadQueue = new AsyncQueue( 10 );
-		const progress = new Progress( `下载 ${ pluginName } lib 资源`, 0 );
-		let downloadNum: number = 0, errorNum: number = 0;
-		for ( const fileName in cdnLib.libs ) {
-			const targetPath = [pluginKey, saveDir, fileName].join( "/" );
-			const savePath = this.bot.file.getFilePath( targetPath, "plugin" );
-			const fileExist = await this.bot.file.isExist( savePath );
-			// 已存在不进行下载
-			if ( fileExist ) {
-				continue;
+	/* 卸载插件 */
+	public async unLoadSingle( pluginKey: string, reloadCmd = true ) {
+		try {
+			await this.doUnMount( pluginKey );
+			const refresh = Refreshable.getInstance();
+			refresh.logout( pluginKey );
+			
+			/* 关闭静态资源更新任务 */
+			const assetsUpdate = AssetsUpdate.getInstance();
+			assetsUpdate.deregisterCheckUpdateJob( pluginKey );
+			
+			const setting = this.pluginSettings[pluginKey];
+			
+			Reflect.deleteProperty( this.pluginList, pluginKey );
+			Reflect.deleteProperty( this.pluginSettings, pluginKey );
+			
+			if ( reloadCmd ) {
+				await this.bot.command.reload();
 			}
-			const downloadPath = cdnLib.libs[fileName];
-			downloadPromiseList.push( downloadQueue.enqueue( () => {
-				return this.bot.file.downloadFile( downloadPath, targetPath, undefined, "plugin" )
-					.catch( () => {
-						errorNum++;
-					} )
-					.finally( () => {
-						downloadNum++;
-						progress.renderer( downloadNum, total => {
-							return `${ downloadNum }/${ total } 下载失败：${ errorNum }`
-						}, this.bot.config.webConsole.enable );
-					} );
-			} ) )
+			return setting;
+		} catch ( error ) {
+			this.bot.logger.error( `插件 ${ pluginKey } 卸载异常: ${ <string>error }` );
 		}
-		
-		// 重新设置进度条长度
-		progress.setTotal( downloadPromiseList.length );
-		// 遍历下载资源文件
-		await Promise.all( downloadPromiseList );
 	}
 	
 	/**
@@ -308,37 +305,12 @@ export default class Plugin {
 		}
 	}
 	
-	/* 卸载插件 */
-	public async unLoadSingle( pluginKey: string, reloadCmd = true  ) {
-		try {
-			await this.doUnMount( pluginKey );
-			const refresh = Refreshable.getInstance();
-			refresh.logout( pluginKey );
-			
-			/* 关闭静态资源更新任务 */
-			const assetsUpdate = AssetsUpdate.getInstance();
-			assetsUpdate.deregisterCheckUpdateJob( pluginKey );
-			
-			const setting = this.pluginSettings[pluginKey];
-			
-			Reflect.deleteProperty( this.pluginList, pluginKey );
-			Reflect.deleteProperty( this.pluginSettings, pluginKey );
-			
-			if ( reloadCmd ) {
-				await this.bot.command.reload();
-			}
-			return setting;
-		} catch ( error ) {
-			this.bot.logger.error( `插件 ${ pluginKey } 卸载异常: ${ <string>error }` );
-		}
-	}
-	
 	/**
 	 * 执行插件 mounted 钩子
 	 * @param pluginKey 插件目录名
 	 */
 	public async doMount( pluginKey: string ) {
-		const setting = this.pluginSettings[ pluginKey ];
+		const setting = this.pluginSettings[pluginKey];
 		try {
 			if ( setting.mounted ) {
 				await setting.mounted( this.getPluginParameter( pluginKey ) );
@@ -350,6 +322,47 @@ export default class Plugin {
 			this.bot.logger.error( `插件 ${ pluginKey } mounted 钩子执行异常: ${ <string>error }` );
 			return false;
 		}
+	}
+	
+	/* 下载 cdn lib 资源 */
+	private async downloadCDNLib( cdnLib: PluginSetting["cdnLib"], pluginKey: string, pluginName: string ) {
+		if ( !cdnLib ) {
+			return;
+		}
+		
+		const saveDir = cdnLib.saveDir || "adachi-lib";
+		const downloadPromiseList: Promise<unknown>[] = [];
+		
+		const downloadQueue = new AsyncQueue( 10 );
+		const progress = new Progress( `下载 ${ pluginName } lib 资源`, 0 );
+		let downloadNum: number = 0, errorNum: number = 0;
+		for ( const fileName in cdnLib.libs ) {
+			const targetPath = [ pluginKey, saveDir, fileName ].join( "/" );
+			const savePath = this.bot.file.getFilePath( targetPath, "plugin" );
+			const fileExist = await this.bot.file.isExist( savePath );
+			// 已存在不进行下载
+			if ( fileExist ) {
+				continue;
+			}
+			const downloadPath = cdnLib.libs[fileName];
+			downloadPromiseList.push( downloadQueue.enqueue( () => {
+				return this.bot.file.downloadFile( downloadPath, targetPath, undefined, "plugin" )
+					.catch( () => {
+						errorNum++;
+					} )
+					.finally( () => {
+						downloadNum++;
+						progress.renderer( downloadNum, total => {
+							return `${ downloadNum }/${ total } 下载失败：${ errorNum }`
+						}, this.bot.config.webConsole.enable );
+					} );
+			} ) )
+		}
+		
+		// 重新设置进度条长度
+		progress.setTotal( downloadPromiseList.length );
+		// 遍历下载资源文件
+		await Promise.all( downloadPromiseList );
 	}
 	
 	/**
@@ -458,7 +471,10 @@ export default class Plugin {
 		return {
 			...bot,
 			setAlias( aliases ) {
-				that.pluginList[ key ].aliases = aliases;
+				that.pluginList[key].aliases = aliases;
+			},
+			setAuthorization( authorization ) {
+				that.pluginList[key].authorization = authorization;
 			},
 			refreshRegister(
 				fileNameOrTarget: string | RefreshTarget<"fun"> | RefreshTarget<"file">,
