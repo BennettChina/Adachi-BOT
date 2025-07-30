@@ -231,7 +231,10 @@ class PluginUpgrade {
 	 * @return 是否更新成功
 	 */
 	private async updateBotPlugin( pluginInfo: PluginInfo, isForce: boolean = false ): Promise<boolean> {
-		const command = !isForce ? "git pull --no-rebase" : "git reset --hard && git pull --no-rebase";
+		const needAuth = !!( pluginInfo.isPrivate && pluginInfo.authorization );
+		const authRepo = `https://${ pluginInfo.owner }:${ pluginInfo.authorization }@github.com/${ pluginInfo.owner }/${ pluginInfo.repoName }.git`;
+		const pullCommand = `git pull ${ needAuth ? authRepo : "" } --no-rebase`;
+		const command = !isForce ? pullCommand : `git reset --hard && ${ pullCommand }`;
 		const cwd = this.file.getFilePath( pluginInfo.key, "plugin" );
 		const proxy_env = {};
 		if ( this.config.base.proxy.enabled ) {

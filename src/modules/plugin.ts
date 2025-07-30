@@ -40,6 +40,12 @@ export interface PluginInfo {
 	key: string;
 	name: string;
 	upgrade?: string;
+	/** 仓库拥有者名称 */
+	owner?: string;
+	/** 仓库名称 */
+	repoName?: string;
+	/** 分支名称 */
+	ref?: string;
 	/** 是否私有仓库 */
 	isPrivate?: boolean;
 	/** 私有仓库的访问 token */
@@ -194,8 +200,15 @@ export default class Plugin {
 				
 				plugin.upgrade = "https://api.github.com/repos/" + serverUrl;
 				if ( typeof repo !== "string" ) {
+					plugin.owner = repo.owner;
+					plugin.repoName = repo.repoName;
+					plugin.ref = repo.ref;
 					plugin.isPrivate = repo.isPrivate;
 					plugin.authorization = repo.authorization;
+				} else {
+					const [ owner, repoName ] = repo.split( "/" );
+					plugin.owner = owner;
+					plugin.repoName = repoName;
 				}
 			}
 			
