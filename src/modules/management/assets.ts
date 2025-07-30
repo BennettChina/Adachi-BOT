@@ -65,7 +65,7 @@ export default class AssetsUpdate {
 	private jobMap: Map<string, AssetsJobInfo> = new Map();
 	
 	constructor( private bot: BOT ) {
-		scheduleJob( "0 0 */6 * * *", () => {
+		scheduleJob( "0 0 */2 * * ?", () => {
 			this.jobMap.forEach( el => {
 				// 从一小时内随机取一段时间检查更新
 				const time = Date.now() + getRandomNumber( 0, 55 * 60 * 1000 );
