@@ -398,18 +398,19 @@ export class Client {
 		return this.baseClient.fetchApi( "get_status", undefined );
 	}
 	
+	// -------------- 以下属于扩展的 API，使用时需要判断是否接口存在 (retcode: 1401) ---------------- //
 	
 	/**
-	 * @deprecated 删除好友
-	 * @description go-cqhttp 限定，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
+	 * 删除好友
+	 * @description 扩展 API，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
 	 */
 	public deleteFriend( user_id: number ) {
 		return this.baseClient.fetchApi( "delete_friend", { user_id } );
 	}
 	
 	/**
-	 * @deprecated 发送合并转发 ( 群聊 )
-	 * @description go-cqhttp 限定，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
+	 * 发送合并转发 ( 群聊 )
+	 * @description 扩展 API，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
 	 */
 	public sendGroupForwardMessage( group_id: number, messages: ForwardElem ) {
 		if ( this.oneBotVersion?.app_name === "go-cqhttp" ) {
@@ -425,8 +426,8 @@ export class Client {
 	}
 	
 	/**
-	 * @deprecated 发送合并转发 ( 好友 )
-	 * @description go-cqhttp 限定，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
+	 * 发送合并转发 ( 好友 )
+	 * @description 扩展 API，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
 	 */
 	public sendPrivateForwardMessage( user_id: number, messages: ForwardElem ) {
 		if ( this.oneBotVersion?.app_name === "go-cqhttp" ) {
@@ -442,8 +443,8 @@ export class Client {
 	}
 	
 	/**
-	 * @deprecated 获取群消息历史记录
-	 * @description go-cqhttp 限定，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
+	 * 获取群消息历史记录
+	 * @description 扩展 API，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
 	 */
 	public async getGroupMsgHistory( group_id: number, message_seq: number ) {
 		const result = await this.baseClient.fetchApi( "get_group_msg_history", { group_id, message_seq } );
@@ -451,11 +452,35 @@ export class Client {
 	}
 	
 	/**
-	 * @deprecated 获取群 @全体成员 剩余次数
-	 * @description go-cqhttp 限定，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
+	 * 获取群 @全体成员 剩余次数
+	 * @description 扩展 API，使用时需要判断返回值的 retcode 属性值是否为 1404（不存在）
 	 */
 	public getGroupAtAllRemain( group_id: number ) {
 		return this.baseClient.fetchApi( "get_group_at_all_remain", { group_id } );
+	}
+	
+	/**
+	 * 扩展 API: 获取私聊的文件 URL
+	 * @param user_id 用户 QQ
+	 * @param file_id 文件 ID
+	 */
+	public getPrivateFileUrl( user_id: number, file_id: string ) {
+		return this.baseClient.fetchApi( "get_private_file_url", {
+			user_id,
+			file_id
+		} )
+	}
+	
+	/**
+	 * 扩展 API: 获取群聊中的文件 URL
+	 * @param group_id 群号
+	 * @param file_id 文件 ID
+	 */
+	public getGroupFileUrl( group_id: number, file_id: string ) {
+		return this.baseClient.fetchApi( "get_group_file_url", {
+			group_id,
+			file_id
+		} )
 	}
 }
 

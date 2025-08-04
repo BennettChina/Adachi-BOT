@@ -57,7 +57,8 @@ export interface NoCacheParam {
 }
 
 /** 获取陌生人信息 */
-export interface GetStrangerInfoParam extends NoCacheParam, OperateUserParam {}
+export interface GetStrangerInfoParam extends NoCacheParam, OperateUserParam {
+}
 
 /**
  * 发送消息
@@ -72,10 +73,12 @@ interface CommonSendMsg {
 }
 
 /** 发送私聊消息 */
-export interface SendPrivateMsgParam extends CommonSendMsg, OperateUserParam {}
+export interface SendPrivateMsgParam extends CommonSendMsg, OperateUserParam {
+}
 
 /** 发送群聊消息 */
-export interface SendGroupMsgParam extends CommonSendMsg, OperateGroupParam {}
+export interface SendGroupMsgParam extends CommonSendMsg, OperateGroupParam {
+}
 
 interface SendMsgPrivate extends CommonSendMsg, OperateUserParam {
 	message_type: "private";
@@ -131,6 +134,20 @@ export interface GetRecordParam {
 	out_format: RecordFormat;
 }
 
+export interface GetPrivateFileUrlParam {
+	/** 用户 QQ */
+	user_id: number;
+	/** 文件 ID */
+	file_id: string;
+}
+
+export interface GetGroupFileUrlParam {
+	/** 群号 */
+	group_id: number;
+	/** 文件 ID */
+	file_id: string;
+}
+
 /** 处理加好友请求 */
 export interface SetFriendAddRequestParam {
 	/** 请求的 flag（需从上报的数据中获得） */
@@ -150,14 +167,17 @@ interface SetGroupAddRequestParamOther extends SetFriendAddRequestParam {
 	/** 请求类型（需要和上报消息中的 sub_type 字段相符） */
 	type: string;
 }
+
 /** 处理群请求 */
 export type SetGroupAddRequestParam = SetGroupAddRequestParamOne | SetGroupAddRequestParamOther;
 
 /** 处理群请求 */
-export interface GetGroupInfoParam extends NoCacheParam, OperateGroupParam {}
+export interface GetGroupInfoParam extends NoCacheParam, OperateGroupParam {
+}
 
 /** 获取群成员信息 */
-export interface GetGroupMemberInfoParam extends GetGroupInfoParam, OperateUserParam {}
+export interface GetGroupMemberInfoParam extends GetGroupInfoParam, OperateUserParam {
+}
 
 /** 获取群荣誉信息 */
 export interface GetGroupHonorInfoParam extends OperateGroupParam {

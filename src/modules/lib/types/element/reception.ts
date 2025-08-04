@@ -172,7 +172,25 @@ export interface JsonRecepElem {
 	}
 }
 
+/**
+ * 文件类型（扩展实现，非标准消息）
+ */
+export interface FileRecepElem {
+	"type": "file",
+	"data": {
+		// 文件 ID
+		file_id: string;
+		// 文件名
+		file_name?: string;
+		// 文件名（部分实现端使用的字段名）
+		file?: string;
+		// 文件大小（部分实现端存在）
+		file_size?: number;
+	}
+}
+
 /** 接收到的消息类型 */
 export type MessageRecepElem = TextRecepElem | FaceRecepElem | RecordRecepElem | VideoRecepElem | AtRecepElem |
 	RpsRecepElem | DiceRecepElem | ShakeRecepElem | PokeRecepElem | ShareRecepElem | ContactRecepElem |
-	LocationRecepElem | ImageRecepElem | ReplyRecepElem | ForwardRecepElem | XmlRecepElem | JsonRecepElem;
+	LocationRecepElem | ImageRecepElem | ReplyRecepElem | ForwardRecepElem | XmlRecepElem | JsonRecepElem |
+	FileRecepElem;

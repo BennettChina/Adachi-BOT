@@ -77,14 +77,18 @@ export interface ApiMap {
 	set_restart: ( param: api.RestartParam ) => void;
 	/** 清理缓存 */
 	clean_cache: () => void;
-	/** @deprecated go-cqhttp 限定，删除好友 */
+	/** 扩展 API: 删除好友 */
 	delete_friend: ( param: api.OperateUserParam ) => void;
-	/** @deprecated go-cqhttp 限定，发送合并转发 ( 群聊 ) */
+	/** 扩展 API: 发送合并转发 ( 群聊 ) */
 	send_group_forward_msg: ( param: api.SendGroupForwardMsgParam ) => api.SendForwardMessage;
-	/** @deprecated go-cqhttp 限定，发送合并转发 ( 好友 ) */
+	/** 扩展 API: 发送合并转发 ( 好友 ) */
 	send_private_forward_msg: ( param: api.SendPrivateForwardMsgParam ) => api.SendForwardMessage;
-	/** @deprecated go-cqhttp 限定，获取群消息历史记录 */
+	/** 扩展 API: 获取群消息历史记录 */
 	get_group_msg_history: ( param: api.GetGroupMsgHistoryParam ) => api.GroupMsgHistory;
-	/** @deprecated go-cqhttp 限定，获取群 @全体成员 剩余次数 */
+	/** 扩展 API: 获取群 @全体成员 剩余次数 */
 	get_group_at_all_remain: ( param: api.OperateGroupParam ) => api.GroupAtAllRemain;
+	/** 扩展 API: 获取私聊的文件资源链接 */
+	get_private_file_url: ( param: api.GetPrivateFileUrlParam ) => api.FileUrl;
+	/** 扩展 API: 获取群聊的文件资源链接 */
+	get_group_file_url: ( param: api.GetGroupFileUrlParam ) => api.FileUrl;
 }

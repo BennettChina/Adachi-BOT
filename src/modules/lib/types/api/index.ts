@@ -7,3 +7,4 @@ export * from "./image";
 export * from "./message";
 export * from "./record";
 export * from "./params";
+export * from "./file";
