@@ -7,7 +7,8 @@ import {
 	FriendInfo,
 	GroupInfo,
 	OneBotVersionInfo,
-	Sendable, toCqCode,
+	Sendable,
+	toCqCode,
 	toMessageRecepElem
 } from "@/modules/lib";
 import { getLogger, Logger } from "log4js";
@@ -298,6 +299,12 @@ export default abstract class BaseClient {
 							break;
 					}
 					this.emitter.emit( "notice.group", data );
+				}
+				if ( data.notice_type === "bot_offline" && this.online ) {
+					this.online = false;
+					/* 连接关闭时关闭 bot 状态轮询 */
+					this.closeHeartTimer();
+					this.emitter.emit( "system.offline" );
 				}
 				this.emitter.emit( "notice", data );
 			}

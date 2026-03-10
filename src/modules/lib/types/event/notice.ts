@@ -8,7 +8,7 @@ export type NoticeEvent = NoticePrivateEvent | NoticeGroupEvent;
 export type NoticePrivateEvent = PrivateRecallNoticeEvent | FriendAddNoticeEvent;
 
 /** 群通知 */
-export type NoticeGroupEvent = GroupRecallNoticeEvent | GroupIncreaseNoticeEvent |GroupDecreaseNoticeEvent |
+export type NoticeGroupEvent = GroupRecallNoticeEvent | GroupIncreaseNoticeEvent | GroupDecreaseNoticeEvent |
 	GroupAdminNoticeEvent | GroupUploadNoticeEvent | GroupBanNoticeEvent | GroupPokeNoticeEvent |
 	GroupLuckKingNoticeEvent | GroupHonorNoticeEvent;
 
@@ -172,4 +172,16 @@ export interface GroupHonorNoticeEvent extends CommonNoticeEvent {
 	user_id: number;
 	/** 荣誉类型 talkative:龙王 performer:群聊之火 emotion:快乐源泉 */
 	honor_type: HonorType;
+}
+
+/** 机器人离线通知（扩展通知事件 - NapCat） */
+export interface BotOfflineEvent extends CommonNoticeEvent {
+	/** 通知类型 */
+	notice_type: 'bot_offline';
+	/** 机器人 QQ 号 */
+	user_id: number;
+	/** 标签 */
+	tag: string;
+	/** 离线消息 */
+	message: string;
 }

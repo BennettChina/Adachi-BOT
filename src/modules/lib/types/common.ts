@@ -57,8 +57,22 @@ export type PostMessageSubType = "friend" | "group" | "other" | "normal" | "anon
 export type PostRequestType = "friend" | "group";
 
 /** 通知类型 */
-export type PostNoticeType = "group_upload" | "group_admin" | "group_decrease" | "group_increase" | "group_ban" | "friend_add" |
-	"group_recall" | "friend_recall" | "group_card" | "offline_file" | "client_status" | "essence" | "notify";
+export type PostNoticeType =
+	"group_upload"
+	| "group_admin"
+	| "group_decrease"
+	| "group_increase"
+	| "group_ban"
+	| "friend_add"
+	|
+	"group_recall"
+	| "friend_recall"
+	| "group_card"
+	| "offline_file"
+	| "client_status"
+	| "essence"
+	| "notify"
+	| "bot_offline";//from NapCat
 
 /** 元事件类型 */
 export type PostMetaEventType = "lifecycle" | "heartbeat";
